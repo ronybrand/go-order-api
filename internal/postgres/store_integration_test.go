@@ -202,6 +202,48 @@ func TestOrders_SaveAppliesQuantityChangesAndRemovals(t *testing.T) {
 	}
 }
 
+func TestOrders_SaveMixesUpdatedUntouchedAndNewItemsInOneGo(t *testing.T) {
+	store := newStore(t)
+	ctx := context.Background()
+	c := newCustomer(t, store, "12345678", nil)
+	o := newOrder(t, store, c.ID) // Pen 2.50 x 4
+	_ = o.AddItem(domain.ItemInput{Description: "Ink", UnitPrice: decimal.RequireFromString("1.10"), Quantity: 1}, "u", now)
+	_ = o.AddItem(domain.ItemInput{Description: "Cap", UnitPrice: decimal.RequireFromString("0.05"), Quantity: 7}, "u", now)
+	if err := store.Repos().Orders.Save(ctx, o); err != nil {
+		t.Fatal(err)
+	}
+	loaded, _ := store.Repos().Orders.Get(ctx, o.ID)
+	penID, inkID, capID := loaded.Items[0].ID, loaded.Items[1].ID, loaded.Items[2].ID
+	_ = loaded.UpdateItemQuantity(inkID, 5, "u", now) // changed; Pen and Cap stay untouched
+	_ = loaded.AddItem(domain.ItemInput{Description: "Box", UnitPrice: decimal.RequireFromString("9.99"), Quantity: 2}, "u", now)
+
+	if err := store.Repos().Orders.Save(ctx, loaded); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := store.Repos().Orders.Get(ctx, o.ID)
+
+	if len(got.Items) != 4 {
+		t.Fatalf("items = %+v", got.Items)
+	}
+	want := []struct {
+		id       uuid.UUID
+		desc     string
+		price    string
+		quantity int
+	}{
+		{penID, "Pen", "2.5", 4}, {inkID, "Ink", "1.1", 5}, {capID, "Cap", "0.05", 7}, {uuid.Nil, "Box", "9.99", 2},
+	}
+	for i, w := range want {
+		item := got.Items[i]
+		if (w.id != uuid.Nil && item.ID != w.id) || item.Description != w.desc || !item.UnitPrice.Equal(decimal.RequireFromString(w.price)) || item.Quantity != w.quantity {
+			t.Errorf("item %d = %+v, want %+v", i, item, w)
+		}
+	}
+	if !got.Total().Equal(decimal.RequireFromString("35.83")) { // 10.00 + 5.50 + 0.35 + 19.98
+		t.Errorf("total = %s", got.Total())
+	}
+}
+
 func TestOrders_SaveRejectsAStaleVersion(t *testing.T) {
 	store := newStore(t)
 	ctx := context.Background()

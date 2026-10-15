@@ -138,22 +138,45 @@ func syncItems(ctx context.Context, conn db, o *domain.Order) error {
 	if _, err := conn.Exec(ctx, "DELETE FROM order_items WHERE order_id = $1 AND NOT (id = ANY($2))", o.ID, keep); err != nil {
 		return err
 	}
+	if err := updateItems(ctx, conn, o.ID, o.Items); err != nil {
+		return err
+	}
 	for i := range o.Items {
-		item := &o.Items[i]
-		if item.ID == uuid.Nil {
+		if item := &o.Items[i]; item.ID == uuid.Nil {
 			item.OrderID = o.ID
 			if err := insertItem(ctx, conn, item); err != nil {
 				return err
 			}
-			continue
-		}
-		if _, err := conn.Exec(ctx, `UPDATE order_items SET description = $3, unit_price = $4::text::numeric, quantity = $5
-			WHERE id = $1 AND order_id = $2`,
-			item.ID, o.ID, item.Description, item.UnitPrice.StringFixed(2), item.Quantity); err != nil {
-			return err
 		}
 	}
 	return nil
+}
+
+// updateItems writes the already stored items in one statement, however many there are, and only touches the
+// rows that actually differ. Prices travel as text and are cast by the server, like on insert.
+func updateItems(ctx context.Context, conn db, orderID uuid.UUID, items []domain.Item) error {
+	var ids []uuid.UUID
+	var descriptions, prices []string
+	var quantities []int32
+	for _, item := range items {
+		if item.ID == uuid.Nil {
+			continue
+		}
+		ids = append(ids, item.ID)
+		descriptions = append(descriptions, item.Description)
+		prices = append(prices, item.UnitPrice.StringFixed(2))
+		quantities = append(quantities, int32(item.Quantity)) //nolint:gosec // bounded by domain.MaxQuantity
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	_, err := conn.Exec(ctx, `UPDATE order_items AS i
+		SET description = v.description, unit_price = v.unit_price::numeric, quantity = v.quantity
+		FROM unnest($2::uuid[], $3::text[], $4::text[], $5::int[]) AS v(id, description, unit_price, quantity)
+		WHERE i.order_id = $1 AND i.id = v.id
+		  AND (i.description, i.unit_price, i.quantity) IS DISTINCT FROM (v.description, v.unit_price::numeric, v.quantity)`,
+		orderID, ids, descriptions, prices, quantities)
+	return err
 }
 
 func (r *orderRepo) SoftDelete(ctx context.Context, id uuid.UUID, actor string, at time.Time) error {
