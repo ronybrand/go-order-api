@@ -14,6 +14,11 @@ const (
 
 	CodeBodyTooLarge = "VALIDATION-12"
 
+	// Additions of this implementation: the spec leaves unmatched routes and methods to the framework default,
+	// this API answers them in the same error envelope as everything else.
+	CodeMethodNotAllowed = "VALIDATION-13"
+	CodeRouteNotFound    = "RESOURCE-NOT-FOUND-00"
+
 	CodeCustomerNotFound = "RESOURCE-NOT-FOUND-01"
 	CodeOrderNotFound    = "RESOURCE-NOT-FOUND-02"
 	CodeItemNotFound     = "RESOURCE-NOT-FOUND-03"
