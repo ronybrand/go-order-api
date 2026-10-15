@@ -119,8 +119,8 @@ func New(opts Options) http.Handler {
 	return chain(a.routeErrors(mux),
 		requestID,
 		securityHeaders,
+		accessLog(opts.Logger), // outside recoverer: a request that panicked is still logged, with its 500
 		recoverer(opts.Logger),
-		accessLog(opts.Logger),
 		cors(opts.CORSOrigins),
 		exceptPath(healthPath, rateLimit(ipLimit, clientIP, opts.Logger)),
 		bodyLimit(opts.MaxBodyBytes),
