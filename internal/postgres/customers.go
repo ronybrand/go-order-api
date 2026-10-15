@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -118,7 +119,7 @@ func (r *customerRepo) Search(ctx context.Context, req app.SearchRequest) (app.P
 	if err := r.db.QueryRow(ctx, "SELECT count(*) FROM customers WHERE "+q.where, q.args...).Scan(&page.Total); err != nil {
 		return page, wrap("count customers", err)
 	}
-	args := append(q.args, req.Size, req.Offset())
+	args := slices.Concat(q.args, []any{req.Size, req.Offset()}) // a copy: never write into q.args's spare capacity
 	rows, err := r.db.Query(ctx, "SELECT "+customerColumns+" FROM customers WHERE "+q.where+
 		" ORDER BY "+q.orderBy+" LIMIT $"+itoa(len(q.args)+1)+" OFFSET $"+itoa(len(q.args)+2), args...)
 	if err != nil {
