@@ -33,7 +33,7 @@ const (
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	if err := run(logger); err != nil {
-		logger.Error("api stopped", "error", err)
+		logger.ErrorContext(context.Background(), "api stopped", "error", err)
 		os.Exit(1)
 	}
 }
@@ -88,7 +88,7 @@ func run(logger *slog.Logger) error {
 
 	failed := make(chan error, 1)
 	go func() {
-		logger.Info("listening", "addr", cfg.HTTPAddr, "environment", cfg.Environment)
+		logger.InfoContext(ctx, "listening", "addr", cfg.HTTPAddr, "environment", cfg.Environment)
 		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			failed <- err
 		}
@@ -99,7 +99,7 @@ func run(logger *slog.Logger) error {
 		return err
 	case <-ctx.Done():
 	}
-	logger.Info("shutting down")
+	logger.InfoContext(ctx, "shutting down")
 	// A fresh context: ctx is already canceled, and in-flight requests deserve their grace period.
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
