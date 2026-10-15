@@ -17,7 +17,13 @@ jobs:
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U orders" --health-interval 5s --health-retries 10
+      rabbitmq:
+        image: rabbitmq:3.13-alpine
+        ports: ["5672:5672"]
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping" --health-interval 10s --health-retries 10
     env:
+      TEST_BROKER_URL: amqp://guest:guest@127.0.0.1:5672/
       TEST_DATABASE_URL: postgres://orders:orders@127.0.0.1:5432/orders?sslmode=disable
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -27,5 +33,6 @@ jobs:
       - run: go vet ./...
       - uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
         with: { version: latest }
-      - run: go test -race -cover -count=1 ./...
+      - run: go test -race -count=1 -coverprofile=coverage.out ./internal/...
+      - run: sh scripts/check-coverage.sh coverage.out 80
       - run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0 && govulncheck ./...
