@@ -16,31 +16,10 @@ jobs:
         id: metadata
 
       # Major bumps are left out: always reviewed by hand.
-      # Branch protection with required checks is not available on a private repository of this plan, and without
-      # it `gh pr merge --auto` merges at once. So this job waits for the CI jobs itself and merges only if they all pass.
+      # `--auto` waits for the branch protection's required checks and merges when they pass (it
+      # stays open if one fails), so the job itself is over in a second instead of holding a runner.
       - if: steps.metadata.outputs.update-type != 'version-update:semver-major'
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REQUIRED: verify
-        run: |
-          for attempt in $(seq 1 120); do
-            checks=$(gh pr checks "$PR_URL" --json name,state)
-            failed=$(echo "$checks" | jq '[.[] | select(.state == "FAILURE" or .state == "ERROR" or .state == "CANCELLED")] | length')
-            if [ "$failed" -gt 0 ]; then
-              echo "a check failed: not merging"
-              exit 1
-            fi
-            passed=0
-            for name in $REQUIRED; do
-              ok=$(echo "$checks" | jq --arg n "$name" '[.[] | select(.name == $n and .state == "SUCCESS")] | length')
-              passed=$((passed + ok))
-            done
-            if [ "$passed" -ge "$(echo $REQUIRED | wc -w)" ]; then
-              gh pr merge --squash "$PR_URL"
-              exit 0
-            fi
-            sleep 15
-          done
-          echo "timed out waiting for the required checks"
-          exit 1
+        run: gh pr merge --auto --squash "$PR_URL"
