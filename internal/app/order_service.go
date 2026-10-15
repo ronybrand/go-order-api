@@ -2,12 +2,16 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/ronybrand/go-order-api/internal/apperr"
 	"github.com/ronybrand/go-order-api/internal/domain"
 )
+
+// announceTimeout bounds the lookup and the publish that follow a committed transition.
+const announceTimeout = 10 * time.Second
 
 // OrderService implements the order use cases.
 type OrderService struct {
@@ -157,8 +161,17 @@ func (s *OrderService) announce(ctx context.Context, order *domain.Order, old do
 	if s.publisher == nil {
 		return
 	}
+	// The transition is already committed: a client that hangs up now must not cancel its notification, and a
+	// slow broker must not hold the request open without bound.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), announceTimeout)
+	defer cancel()
 	customer, err := s.store.Repos().Customers.Get(ctx, order.CustomerID)
-	if err != nil || customer.Email == "" {
+	if err != nil {
+		s.opts.logger.ErrorContext(ctx, "could not load the customer to announce an order status change",
+			"order_id", order.ID, "error", err)
+		return
+	}
+	if customer.Email == "" {
 		return
 	}
 	event := domain.OrderStatusChanged{

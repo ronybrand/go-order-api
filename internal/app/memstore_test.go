@@ -348,3 +348,19 @@ func (p *recordingPublisher) PublishStatusChanged(_ context.Context, event domai
 	p.events = append(p.events, event)
 	return p.err
 }
+
+// ctxPublisher records what the context handed to the publisher looks like.
+type ctxPublisher struct {
+	calls       int
+	ctxErr      error
+	hasDeadline bool
+	actor       app.Actor
+}
+
+func (p *ctxPublisher) PublishStatusChanged(ctx context.Context, _ domain.OrderStatusChanged) error {
+	p.calls++
+	p.ctxErr = ctx.Err()
+	_, p.hasDeadline = ctx.Deadline()
+	p.actor = app.ActorFrom(ctx)
+	return nil
+}

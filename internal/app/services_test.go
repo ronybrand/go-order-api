@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"log/slog"
@@ -407,6 +408,57 @@ func TestOrderService_ABrokerFailureNeverFailsTheTransition(t *testing.T) {
 	stored, _ := svc.Get(context.Background(), order.ID)
 	if stored.Status != domain.StatusConfirmed {
 		t.Errorf("stored status = %s", stored.Status)
+	}
+}
+
+func TestOrderService_AnnounceSurvivesTheRequestContext(t *testing.T) {
+	store := newMemStore()
+	c := seedCustomerWithEmail(store, "ada@example.com")
+	pub := &ctxPublisher{}
+	svc := newOrderService(store, pub)
+	order, _ := svc.Create(asUser("u"), c.ID, []domain.ItemInput{widget("1", 1)})
+	// The client hangs up: by the time the commit is done the request context may already be canceled.
+	ctx, cancel := context.WithCancel(asUser("u"))
+	cancel()
+
+	if _, err := svc.Confirm(ctx, order.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	if pub.calls != 1 {
+		t.Fatalf("publish calls = %d, want 1", pub.calls)
+	}
+	if pub.ctxErr != nil {
+		t.Errorf("publisher got a canceled context: %v", pub.ctxErr)
+	}
+	if !pub.hasDeadline {
+		t.Error("publisher got a context without a deadline")
+	}
+	if got := pub.actor.ID; got != "u" {
+		t.Errorf("actor lost from the publish context: %q", got)
+	}
+}
+
+func TestOrderService_AnnounceLogsWhyItCouldNotLoadTheCustomer(t *testing.T) {
+	store := newMemStore()
+	c := seedCustomerWithEmail(store, "ada@example.com")
+	pub := &recordingPublisher{}
+	var logs bytes.Buffer
+	svc := app.NewOrderService(store, pub, app.WithClock(fixedClock), app.WithLogger(slog.New(slog.NewTextHandler(&logs, nil))))
+	order, _ := svc.Create(asUser("u"), c.ID, []domain.ItemInput{widget("1", 1)})
+	if err := store.Repos().Customers.SoftDelete(context.Background(), c.ID, "x", fixedNow); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := svc.Confirm(asUser("u"), order.ID); err != nil {
+		t.Fatalf("the transition must not fail: %v", err)
+	}
+
+	if len(pub.events) != 0 {
+		t.Errorf("published without a customer: %+v", pub.events)
+	}
+	if !strings.Contains(logs.String(), "level=ERROR") || strings.Contains(logs.String(), "ada@example.com") {
+		t.Errorf("expected an error log without PII, got: %s", logs.String())
 	}
 }
 
