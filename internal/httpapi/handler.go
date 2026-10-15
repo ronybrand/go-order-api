@@ -94,8 +94,34 @@ func New(opts Options) http.Handler {
 		return chain(a.handle(fn), stack...)
 	}
 	admin := requireRole(auth.RoleAdmin, opts.Logger)
+	mux := a.routes(protected, admin)
 
-	mux := http.NewServeMux()
+	return chain(a.routeErrors(mux.ServeMux),
+		requestID,
+		securityHeaders,
+		accessLog(opts.Logger), // outside recoverer: a request that panicked is still logged, with its 500
+		recoverer(opts.Logger),
+		cors(opts.CORSOrigins),
+		exceptPath(healthPath, rateLimit(ipLimit, clientIP, opts.Logger)),
+		bodyLimit(opts.MaxBodyBytes),
+	)
+}
+
+// routeTable is a ServeMux that remembers the patterns registered on it, so a test can check them against
+// the OpenAPI document.
+type routeTable struct {
+	*http.ServeMux
+	patterns []string
+}
+
+func (t *routeTable) Handle(pattern string, handler http.Handler) {
+	t.patterns = append(t.patterns, pattern)
+	t.ServeMux.Handle(pattern, handler)
+}
+
+// routes registers every endpoint. Authenticated routes go through protected(), the only public one is /health.
+func (a *api) routes(protected func(func(http.ResponseWriter, *http.Request) error, ...Middleware) http.Handler, admin Middleware) *routeTable {
+	mux := &routeTable{ServeMux: http.NewServeMux()}
 	mux.Handle("GET "+healthPath, http.HandlerFunc(a.health))
 
 	mux.Handle("POST /customers", protected(a.createCustomer, admin))
@@ -115,16 +141,7 @@ func New(opts Options) http.Handler {
 	mux.Handle("DELETE /orders/{id}/items/{item_id}", protected(a.removeItem))
 	mux.Handle("POST /orders/{id}/confirm", protected(a.confirmOrder))
 	mux.Handle("POST /orders/{id}/cancel", protected(a.cancelOrder))
-
-	return chain(a.routeErrors(mux),
-		requestID,
-		securityHeaders,
-		accessLog(opts.Logger), // outside recoverer: a request that panicked is still logged, with its 500
-		recoverer(opts.Logger),
-		cors(opts.CORSOrigins),
-		exceptPath(healthPath, rateLimit(ipLimit, clientIP, opts.Logger)),
-		bodyLimit(opts.MaxBodyBytes),
-	)
+	return mux
 }
 
 // handle adapts a handler that returns an error to http.Handler: every failure goes through writeError.
