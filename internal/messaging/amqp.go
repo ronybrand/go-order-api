@@ -137,7 +137,7 @@ func (c *Consumer) Run(ctx context.Context) error {
 	for {
 		err := c.consume(ctx)
 		if ctx.Err() != nil {
-			return nil
+			return nil //nolint:nilerr // a canceled context is the normal shutdown, not a failure
 		}
 		c.logger.ErrorContext(ctx, "consumer stopped, reconnecting", "error", err, "in", reconnectDelay)
 		select {
@@ -231,7 +231,7 @@ func republish(ctx context.Context, ch *amqp.Channel, d amqp.Delivery, queue str
 	for k, v := range d.Headers {
 		headers[k] = v
 	}
-	headers[retryCountHeader] = int32(retries)
+	headers[retryCountHeader] = int32(retries) //nolint:gosec // retries is bounded by MaxRetries
 	return ch.PublishWithContext(ctx, "", queue, false, false, amqp.Publishing{
 		ContentType: d.ContentType, DeliveryMode: amqp.Persistent, MessageId: d.MessageId,
 		Timestamp: d.Timestamp, Headers: headers, Body: d.Body,

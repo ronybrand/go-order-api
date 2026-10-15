@@ -16,7 +16,7 @@ import (
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	if err := run(logger); err != nil {
-		logger.Error("worker stopped", "error", err)
+		logger.ErrorContext(context.Background(), "worker stopped", "error", err)
 		os.Exit(1)
 	}
 }

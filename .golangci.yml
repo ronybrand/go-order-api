@@ -14,6 +14,11 @@ linters:
     sloglint:
       no-mixed-args: true
       context: all
+  exclusions:
+    rules:
+      # Tests build requests and log without a request context on purpose.
+      - path: _test\.go
+        linters: [noctx, sloglint]
 formatters:
   enable:
     - gofmt
