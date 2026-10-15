@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -78,7 +79,7 @@ func recoverer(logger *slog.Logger) Middleware {
 						panic(recovered)
 					}
 					logger.ErrorContext(r.Context(), "panic in handler", "panic", recovered, "request_id", requestIDFrom(r.Context()))
-					writeError(w, r, logger, context.Canceled) // any non-apperr value renders as INTERNAL-00
+					writeError(w, r, logger, fmt.Errorf("panic in handler: %v", recovered)) // not an apperr: renders as INTERNAL-00
 				}
 			}()
 			next.ServeHTTP(w, r)

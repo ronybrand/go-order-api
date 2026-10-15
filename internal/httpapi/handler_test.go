@@ -1,8 +1,10 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -423,5 +425,32 @@ func TestUnknownRouteAndMethodUseTheErrorEnvelope(t *testing.T) {
 	}
 	if notFound.Code != 404 || wrongMethod.Code != 405 {
 		t.Errorf("statuses = %d %d", notFound.Code, wrongMethod.Code)
+	}
+}
+
+func TestAccessLog_RecordsARequestThatPanicked(t *testing.T) {
+	var logs bytes.Buffer
+	h := newHarness(t, func(o *Options) {
+		o.Logger = slog.New(slog.NewJSONHandler(&logs, nil))
+		o.Ping = func(context.Context) error { panic("boom") }
+	})
+
+	rec := h.call(http.MethodGet, "/health", "", "")
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	var access map[string]any
+	for line := range bytes.SplitSeq(logs.Bytes(), []byte{'\n'}) {
+		var entry map[string]any
+		if json.Unmarshal(line, &entry) == nil && entry["msg"] == "request" {
+			access = entry
+		}
+	}
+	if access == nil {
+		t.Fatalf("no access log line for the panicking request: %s", logs.String())
+	}
+	if access["status"] != float64(http.StatusInternalServerError) {
+		t.Errorf("logged status = %v, want 500", access["status"])
 	}
 }
