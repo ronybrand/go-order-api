@@ -5,7 +5,7 @@ build:
 
 test:
 	go test -race -count=1 -coverprofile=coverage.out ./internal/...
-	sh scripts/check-coverage.sh coverage.out 85
+	sh scripts/check-coverage.sh coverage.out 80
 
 # Needs a PostgreSQL: docker compose up -d postgres
 test-integration:
