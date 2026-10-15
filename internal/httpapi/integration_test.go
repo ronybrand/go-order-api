@@ -125,7 +125,7 @@ func (e *env) do(t *testing.T, method, path, token, body string) response {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	raw, _ := io.ReadAll(res.Body)
 	out := response{status: res.StatusCode}
 	_ = json.Unmarshal(raw, &out.body)
