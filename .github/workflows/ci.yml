@@ -69,6 +69,11 @@ jobs:
           tags: go-order-api-${{ matrix.target }}:ci
           cache-from: type=gha,scope=${{ matrix.target }}
           cache-to: type=gha,mode=max,scope=${{ matrix.target }}
+      - name: Image size
+        run: |
+          size=$(docker image inspect "go-order-api-${{ matrix.target }}:ci" --format '{{.Size}}')
+          compressed=$(docker save "go-order-api-${{ matrix.target }}:ci" | gzip -c | wc -c)
+          echo "image size: $((size / 1024 / 1024)) MB uncompressed, about $((compressed / 1024 / 1024)) MB compressed"
       # HIGH/CRITICAL findings with a fix available fail the build; unfixed ones are only noise
       # nobody can act on yet. Covers the distroless base and the Go standard library baked
       # into the binary.
