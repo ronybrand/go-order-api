@@ -57,6 +57,52 @@ A resposta de cliente expõe apenas `id` e `name`: documento, passaporte e e-mai
 - Criar pedido toma `FOR SHARE` no cliente e excluir cliente toma `FOR UPDATE`, na mesma transação da verificação de pedidos ativos: nunca nasce pedido sob um cliente excluído.
 - Unicidade de documento e passaporte é garantida por índices únicos parciais (`WHERE deleted_at IS NULL`); a checagem no service só dá a mensagem amigável.
 
+## Arquitetura
+
+```mermaid
+flowchart LR
+    Cmd["cmd/api e cmd/worker\n(só compõem)"]
+
+    subgraph Adapters["Adaptadores"]
+        direction TB
+        Http["httpapi\n(net/http)"]
+        Pg["postgres\n(pgx, migrations)"]
+        Msg["messaging\n(RabbitMQ, SMTP)"]
+        Auth["auth\n(JWT RS256)"]
+    end
+
+    App["app\ncasos de uso e ports\n(Store, EventPublisher)"]
+    Domain["domain\nCustomer, Order, Item"]
+
+    Cmd -. compõe .-> Adapters
+    Http -- depende de --> App
+    Pg -- depende de --> App
+    Msg -- depende de --> App
+    Http -- depende de --> Auth
+    App -- depende de --> Domain
+```
+
+A dependência aponta sempre para dentro: o domínio não conhece nada, a aplicação declara o que consome e os adaptadores implementam. O pacote `apperr` (catálogo de erros) é usado por todos.
+
+**Uma requisição e o e-mail que ela dispara**
+
+```mermaid
+flowchart LR
+    Client["Cliente"] -->|HTTPS| MW["Middleware\nrequest id, cabeçalhos de segurança,\nCORS, limite de corpo, rate limit"]
+    MW --> Authn["JWT RS256\n+ papel"]
+    Authn --> Handler["Handlers (httpapi)"]
+    Handler --> Service["Serviços (app)"]
+    Service --> Store["postgres.Store"]
+    Store --> DB[("PostgreSQL")]
+    Service -->|"após o commit\n(best effort, sem outbox)"| Pub["EventPublisher"]
+    Pub --> Queue[["RabbitMQ\norder.status.changed"]]
+    Queue --> Worker["Worker (cmd/worker)"]
+    Worker --> Mail(["SMTP: e-mail do cliente"])
+    Worker -. "retry / DLQ" .-> Queue
+```
+
+A API e o worker são dois processos independentes, ligados só pela fila. Se o broker estiver fora do ar, a transição do pedido continua válida e a falha só é registrada ([ADR sobre a ausência de outbox](docs/adr/0002-sem-outbox-transacional.md)).
+
 ## Desenvolvimento
 
 ```sh
