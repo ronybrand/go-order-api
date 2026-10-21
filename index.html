@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>go-order-api — Order Management API in Go</title>
+  <meta name="description" content="API RESTful de gerenciamento de pedidos escrita em Go 1.27 com net/http, PostgreSQL, JWT RS256, RabbitMQ e arquitetura limpa.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-hover: #1c2129;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #00add8;
+      --accent-glow: rgba(0, 173, 216, 0.15);
+      --go-blue: #00add8;
+      --go-dark: #007d9c;
+      --green: #3fb950;
+      --purple: #a371f7;
+      --orange: #d29922;
+      --pink: #f778ba;
+      --radius: 12px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* Hero */
+    .hero {
+      position: relative;
+      padding: 5rem 2rem 4rem;
+      text-align: center;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.5rem;
+      position: relative;
+    }
+    .hero h1 span {
+      background: linear-gradient(135deg, var(--go-blue), var(--purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero .subtitle {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      max-width: 640px;
+      margin: 0 auto 2rem;
+      position: relative;
+    }
+    .hero-buttons {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      position: relative;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .btn-primary {
+      background: var(--go-blue);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: var(--go-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(0, 173, 216, 0.3);
+    }
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover {
+      background: var(--surface-hover);
+      border-color: var(--text-muted);
+      transform: translateY(-1px);
+    }
+
+    /* Container */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    /* Section */
+    section {
+      padding: 4rem 0;
+    }
+    section h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.02em;
+    }
+    section .section-desc {
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+      font-size: 1rem;
+    }
+
+    /* Tech Stack Grid */
+    .stack-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
+    }
+    .stack-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      transition: all 0.25s ease;
+    }
+    .stack-card:hover {
+      border-color: var(--go-blue);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+    }
+    .stack-card .card-icon {
+      font-size: 1.75rem;
+      margin-bottom: 0.5rem;
+    }
+    .stack-card h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+    .stack-card p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    .stack-card .tag {
+      display: inline-block;
+      margin-top: 0.75rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .tag-blue   { background: rgba(0,173,216,0.15); color: var(--go-blue); }
+    .tag-green  { background: rgba(63,185,80,0.15);  color: var(--green);  }
+    .tag-purple { background: rgba(163,113,247,0.15); color: var(--purple); }
+    .tag-orange { background: rgba(210,153,34,0.15);  color: var(--orange); }
+    .tag-pink   { background: rgba(247,120,186,0.15); color: var(--pink);   }
+
+    /* Features */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.25rem;
+    }
+    .feature {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      transition: border-color 0.2s;
+    }
+    .feature:hover { border-color: var(--go-blue); }
+    .feature h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .feature p {
+      color: var(--text-muted);
+      font-size: 0.88rem;
+    }
+
+    /* Endpoints table */
+    .table-wrapper {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    thead { background: var(--surface); }
+    th, td {
+      text-align: left;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      font-weight: 600;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface-hover); }
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85em;
+      background: rgba(0,173,216,0.1);
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      color: var(--go-blue);
+    }
+
+    /* Architecture */
+    .arch-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+    }
+    .arch-layers {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .arch-layer {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      text-align: center;
+      font-weight: 500;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .arch-layer:hover {
+      transform: scale(1.02);
+    }
+    .arch-layer .layer-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .arch-layer .layer-desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+    .layer-cmd     { background: rgba(163,113,247,0.08); border-color: var(--purple); }
+    .layer-adapter { background: rgba(0,173,216,0.08);   border-color: var(--go-blue); }
+    .layer-app     { background: rgba(63,185,80,0.08);   border-color: var(--green); }
+    .layer-domain  { background: rgba(210,153,34,0.08);  border-color: var(--orange); }
+    .arch-arrow {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 1.25rem;
+      line-height: 1;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+    footer a {
+      color: var(--go-blue);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+
+    /* Animations */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up {
+      animation: fadeUp 0.6s ease forwards;
+      opacity: 0;
+    }
+    .fade-up:nth-child(2) { animation-delay: 0.1s; }
+    .fade-up:nth-child(3) { animation-delay: 0.2s; }
+    .fade-up:nth-child(4) { animation-delay: 0.3s; }
+    .fade-up:nth-child(5) { animation-delay: 0.4s; }
+    .fade-up:nth-child(6) { animation-delay: 0.5s; }
+
+    @media (max-width: 600px) {
+      .hero { padding: 3rem 1.5rem 2.5rem; }
+      section { padding: 2.5rem 0; }
+      .stack-grid { grid-template-columns: 1fr; }
+      .features { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Hero -->
+  <header class="hero">
+    <h1><span>go-order-api</span></h1>
+    <p class="subtitle">API RESTful de gerenciamento de pedidos em Go — arquitetura limpa, zero frameworks web, pronta para produção.</p>
+    <div class="hero-buttons">
+      <a href="https://github.com/ronybrand/go-order-api" class="btn btn-primary">
+        ⭐ Ver no GitHub
+      </a>
+      <a href="#stack" class="btn btn-secondary">
+        🔧 Stack
+      </a>
+      <a href="#endpoints" class="btn btn-secondary">
+        📡 Endpoints
+      </a>
+    </div>
+  </header>
+
+  <!-- Stack -->
+  <section id="stack">
+    <div class="container">
+      <h2>Stack</h2>
+      <p class="section-desc">Tecnologias utilizadas neste projeto.</p>
+      <div class="stack-grid">
+
+        <div class="stack-card fade-up">
+          <div class="card-icon">🐹</div>
+          <h3>Go 1.27</h3>
+          <p>Linguagem principal. Binário estático compilado com <code>CGO_ENABLED=0</code>, distribuído em imagem distroless.</p>
+          <span class="tag tag-blue">linguagem</span>
+        </div>
+
+        <div class="stack-card fade-up">
+          <div class="card-icon">🌐</div>
+          <h3>net/http + ServeMux</h3>
+          <p>Servidor HTTP da biblioteca padrão — sem framework web externo. Middlewares compostos manualmente.</p>
+          <span class="tag tag-blue">http</span>
+        </div>
+
+        <div class="stack-card fade-up">
+          <div class="card-icon">🐘</div>
+          <h3>PostgreSQL + pgx/v5</h3>
+          <p>Banco relacional com driver nativo, pool de conexões, migrations automáticas na partida e lock consultivo.</p>
+          <span class="tag tag-green">database</span>
+        </div>
+
+        <div class="stack-card fade-up">
+          <div class="card-icon">🔑</div>
+          <h3>JWT RS256</h3>
+          <p>Autenticação stateless com assinatura assimétrica. Validação de audience e issuer obrigatória em produção.</p>
+          <span class="tag tag-purple">auth</span>
+        </div>
+
+        <div class="stack-card fade-up">
+          <div class="card-icon">🐇</div>
+          <h3>RabbitMQ</h3>
+          <p>Mensageria para eventos <code>order.status.changed</code>. Worker independente consome a fila com retry e DLQ.</p>
+          <span class="tag tag-orange">messaging</span>
+        </div>
+
+        <div class="stack-card fade-up">
+          <div class="card-icon">📧</div>
+          <h3>SMTP</h3>
+          <p>Envio de e-mails transacionais pelo worker. STARTTLS obrigatório em produção. Mailpit para desenvolvimento.</p>
+          <span class="tag tag-pink">email</span>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features">
+    <div class="container">
+      <h2>Destaques</h2>
+      <p class="section-desc">Práticas e garantias implementadas.</p>
+      <div class="features">
+        <div class="feature fade-up">
+          <h3>🏛️ Arquitetura Limpa</h3>
+          <p>Domínio puro, portas declaradas pelo consumidor, adaptadores intercambiáveis.</p>
+        </div>
+        <div class="feature fade-up">
+          <h3>🔒 Concorrência Segura</h3>
+          <p>Versionamento otimista, <code>FOR SHARE</code>/<code>FOR UPDATE</code>, índices únicos parciais.</p>
+        </div>
+        <div class="feature fade-up">
+          <h3>🛡️ Rate Limiting</h3>
+          <p>Limites por usuário, por IP e por tipo de operação (leitura/escrita).</p>
+        </div>
+        <div class="feature fade-up">
+          <h3>🔍 Busca Avançada</h3>
+          <p>Paginação, ordenação e filtros dinâmicos com 9 operadores.</p>
+        </div>
+        <div class="feature fade-up">
+          <h3>🧪 Testes em Tabela</h3>
+          <p>Testes de unidade sem infra (store em memória) e integração com PostgreSQL real.</p>
+        </div>
+        <div class="feature fade-up">
+          <h3>🛡️ PII Protegido</h3>
+          <p>Documento, passaporte e e-mail nunca saem na API nem nos logs.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Endpoints -->
+  <section id="endpoints">
+    <div class="container">
+      <h2>Endpoints</h2>
+      <p class="section-desc">Rotas disponíveis na API.</p>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>Método &amp; Rota</th><th>Permissão</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>GET /health</code></td><td>Público</td></tr>
+            <tr><td><code>POST /customers</code></td><td>admin</td></tr>
+            <tr><td><code>PUT /customers/{id}</code></td><td>admin</td></tr>
+            <tr><td><code>DELETE /customers/{id}</code></td><td>admin</td></tr>
+            <tr><td><code>GET /customers/{id}</code></td><td>Autenticado</td></tr>
+            <tr><td><code>GET /customers/search</code></td><td>Autenticado</td></tr>
+            <tr><td><code>POST /orders</code></td><td>Autenticado</td></tr>
+            <tr><td><code>GET /orders/{id}</code></td><td>Autenticado</td></tr>
+            <tr><td><code>DELETE /orders/{id}</code></td><td>Autenticado</td></tr>
+            <tr><td><code>POST /orders/{id}/confirm</code></td><td>Autenticado</td></tr>
+            <tr><td><code>POST /orders/{id}/cancel</code></td><td>Autenticado</td></tr>
+            <tr><td><code>POST /orders/{id}/items</code></td><td>Autenticado</td></tr>
+            <tr><td><code>PATCH /orders/{id}/items/{item_id}</code></td><td>Autenticado</td></tr>
+            <tr><td><code>DELETE /orders/{id}/items/{item_id}</code></td><td>Autenticado</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section id="architecture">
+    <div class="container">
+      <h2>Arquitetura</h2>
+      <p class="section-desc">Dependências apontam sempre para dentro.</p>
+      <div class="arch-block">
+        <div class="arch-layers">
+          <div class="arch-layer layer-cmd">
+            <div class="layer-name">cmd/api &amp; cmd/worker</div>
+            <div class="layer-desc">Composição — conecta adaptadores aos casos de uso</div>
+          </div>
+          <div class="arch-arrow">↓</div>
+          <div class="arch-layer layer-adapter">
+            <div class="layer-name">Adaptadores</div>
+            <div class="layer-desc">httpapi · postgres · messaging · auth</div>
+          </div>
+          <div class="arch-arrow">↓</div>
+          <div class="arch-layer layer-app">
+            <div class="layer-name">Aplicação (app)</div>
+            <div class="layer-desc">Casos de uso · Ports (Store, EventPublisher)</div>
+          </div>
+          <div class="arch-arrow">↓</div>
+          <div class="arch-layer layer-domain">
+            <div class="layer-name">Domínio</div>
+            <div class="layer-desc">Customer · Order · Item — sem dependências externas</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>
+      <a href="https://github.com/ronybrand/go-order-api">ronybrand/go-order-api</a>
+      &nbsp;·&nbsp; Feito com Go 🐹
+    </p>
+  </footer>
+
+</body>
+</html>
