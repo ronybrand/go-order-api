@@ -3,13 +3,14 @@
 build:
 	go build ./...
 
+# -p 1: internal/postgres and internal/httpapi share the same database and TRUNCATE it in their setup.
 test:
-	go test -race -count=1 -coverprofile=coverage.out ./internal/...
+	go test -p 1 -race -count=1 -coverprofile=coverage.out ./internal/...
 	sh scripts/check-coverage.sh coverage.out 80
 
 # Needs a PostgreSQL: docker compose up -d postgres
 test-integration:
-	TEST_DATABASE_URL=postgres://orders:orders@127.0.0.1:5432/orders?sslmode=disable go test -race -count=1 ./internal/postgres/... ./internal/httpapi/...
+	TEST_DATABASE_URL=postgres://orders:orders@127.0.0.1:5432/orders?sslmode=disable go test -p 1 -race -count=1 ./internal/postgres/... ./internal/httpapi/...
 
 lint:
 	gofmt -l . | (! grep .)
