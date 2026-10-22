@@ -6,8 +6,8 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.11.0
-	github.com/rabbitmq/amqp091-go v1.15.0
-	github.com/shopspring/decimal v1.5.0
+	github.com/rabbitmq/amqp091-go v1.16.0
+	github.com/shopspring/decimal v1.6.0
 	golang.org/x/time v0.16.0
 )
 
