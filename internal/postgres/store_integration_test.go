@@ -76,14 +76,14 @@ func newOrder(t *testing.T, store *postgres.Store, customerID uuid.UUID) *domain
 func TestCustomers_CreateAndGet(t *testing.T) {
 	store := newStore(t)
 	passport := "AB123456"
-	created := newCustomer(t, store, "12345678", &passport)
+	created := newCustomer(t, store, "A1234567", &passport)
 
 	got, err := store.Repos().Customers.Get(context.Background(), created.ID)
 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.ID == uuid.Nil || got.TaxID != "12345678" || *got.PassportNumber != passport || got.Version != 1 || !got.CreatedAt.Equal(now) {
+	if got.ID == uuid.Nil || got.TaxID != "A1234567" || *got.PassportNumber != passport || got.Version != 1 || !got.CreatedAt.Equal(now) {
 		t.Errorf("customer = %+v", got)
 	}
 }
@@ -91,10 +91,10 @@ func TestCustomers_CreateAndGet(t *testing.T) {
 func TestCustomers_UniquenessIsEnforcedByTheDatabase(t *testing.T) {
 	store := newStore(t)
 	passport := "AB123456"
-	newCustomer(t, store, "12345678", &passport)
-	dupTax, _ := domain.NewCustomer(domain.CustomerInput{Name: "B", TaxID: "12345678", Email: "b@example.com"}, "t", now)
+	newCustomer(t, store, "U1234567", &passport)
+	dupTax, _ := domain.NewCustomer(domain.CustomerInput{Name: "B", TaxID: "U1234567", Email: "b@example.com"}, "t", now)
 	other := "ZZ999999"
-	dupPassport, _ := domain.NewCustomer(domain.CustomerInput{Name: "C", TaxID: "87654321", PassportNumber: &passport, Email: "c@example.com"}, "t", now)
+	dupPassport, _ := domain.NewCustomer(domain.CustomerInput{Name: "C", TaxID: "U8765432", PassportNumber: &passport, Email: "c@example.com"}, "t", now)
 	_ = other
 
 	errTax := store.Repos().Customers.Create(context.Background(), dupTax)
@@ -111,14 +111,14 @@ func TestCustomers_UniquenessIsEnforcedByTheDatabase(t *testing.T) {
 func TestCustomers_SoftDeleteHidesAndReleasesUniqueness(t *testing.T) {
 	store := newStore(t)
 	ctx := context.Background()
-	c := newCustomer(t, store, "12345678", nil)
+	c := newCustomer(t, store, "S1234567", nil)
 
 	if err := store.Repos().Customers.SoftDelete(ctx, c.ID, "admin", now); err != nil {
 		t.Fatal(err)
 	}
 	_, getErr := store.Repos().Customers.Get(ctx, c.ID)
-	taken, err := store.Repos().Customers.TaxIDTaken(ctx, "12345678", uuid.Nil)
-	again := newCustomer(t, store, "12345678", nil)
+	taken, err := store.Repos().Customers.TaxIDTaken(ctx, "S1234567", uuid.Nil)
+	again := newCustomer(t, store, "S1234567", nil)
 
 	if !apperr.Is(getErr, apperr.CodeCustomerNotFound) {
 		t.Errorf("get after delete: %v", getErr)
@@ -134,15 +134,20 @@ func TestCustomers_SoftDeleteHidesAndReleasesUniqueness(t *testing.T) {
 func TestCustomers_UpdateChecksTheVersion(t *testing.T) {
 	store := newStore(t)
 	ctx := context.Background()
-	c := newCustomer(t, store, "12345678", nil)
+	c := newCustomer(t, store, "C1234567", nil)
+
+	// Get two copies to simulate concurrent access
 	stale, _ := store.Repos().Customers.Get(ctx, c.ID)
 	fresh, _ := store.Repos().Customers.Get(ctx, c.ID)
-	_ = fresh.Replace(domain.CustomerInput{Name: "New", TaxID: "12345678", Email: "n@example.com"}, "u", now)
-	_ = stale.Replace(domain.CustomerInput{Name: "Old", TaxID: "12345678", Email: "o@example.com"}, "u", now)
 
+	// Update fresh first
+	_ = fresh.Replace(domain.CustomerInput{Name: "New", TaxID: "C1234567", Email: "n@example.com"}, "u", now)
 	if err := store.Repos().Customers.Update(ctx, fresh); err != nil {
 		t.Fatal(err)
 	}
+
+	// Now try to update with stale version
+	_ = stale.Replace(domain.CustomerInput{Name: "Old", TaxID: "C1234567", Email: "o@example.com"}, "u", now)
 	err := store.Repos().Customers.Update(ctx, stale)
 
 	if fresh.Version != 2 {
@@ -156,7 +161,7 @@ func TestCustomers_UpdateChecksTheVersion(t *testing.T) {
 func TestOrders_RoundTripKeepsItemsInOrderAndTotalExact(t *testing.T) {
 	store := newStore(t)
 	ctx := context.Background()
-	c := newCustomer(t, store, "12345678", nil)
+	c := newCustomer(t, store, "O1234567", nil)
 	o := newOrder(t, store, c.ID)
 	if err := o.AddItem(domain.ItemInput{Description: "Ink", UnitPrice: decimal.RequireFromString("0.10"), Quantity: 3}, "u", now); err != nil {
 		t.Fatal(err)
@@ -184,7 +189,7 @@ func TestOrders_RoundTripKeepsItemsInOrderAndTotalExact(t *testing.T) {
 func TestOrders_SaveAppliesQuantityChangesAndRemovals(t *testing.T) {
 	store := newStore(t)
 	ctx := context.Background()
-	c := newCustomer(t, store, "12345678", nil)
+	c := newCustomer(t, store, "S1123456", nil)
 	o := newOrder(t, store, c.ID)
 	_ = o.AddItem(domain.ItemInput{Description: "Ink", UnitPrice: decimal.RequireFromString("1"), Quantity: 1}, "u", now)
 	_ = store.Repos().Orders.Save(ctx, o)
@@ -205,7 +210,7 @@ func TestOrders_SaveAppliesQuantityChangesAndRemovals(t *testing.T) {
 func TestOrders_SaveMixesUpdatedUntouchedAndNewItemsInOneGo(t *testing.T) {
 	store := newStore(t)
 	ctx := context.Background()
-	c := newCustomer(t, store, "12345678", nil)
+	c := newCustomer(t, store, "M1234567", nil)
 	o := newOrder(t, store, c.ID) // Pen 2.50 x 4
 	_ = o.AddItem(domain.ItemInput{Description: "Ink", UnitPrice: decimal.RequireFromString("1.10"), Quantity: 1}, "u", now)
 	_ = o.AddItem(domain.ItemInput{Description: "Cap", UnitPrice: decimal.RequireFromString("0.05"), Quantity: 7}, "u", now)
@@ -247,7 +252,7 @@ func TestOrders_SaveMixesUpdatedUntouchedAndNewItemsInOneGo(t *testing.T) {
 func TestOrders_SaveRejectsAStaleVersion(t *testing.T) {
 	store := newStore(t)
 	ctx := context.Background()
-	c := newCustomer(t, store, "12345678", nil)
+	c := newCustomer(t, store, "R1234567", nil)
 	o := newOrder(t, store, c.ID)
 	a, _ := store.Repos().Orders.Get(ctx, o.ID)
 	b, _ := store.Repos().Orders.Get(ctx, o.ID)
@@ -269,7 +274,7 @@ func TestOrders_SaveRejectsAStaleVersion(t *testing.T) {
 func TestOrders_HasActiveIgnoresDeletedOrders(t *testing.T) {
 	store := newStore(t)
 	ctx := context.Background()
-	c := newCustomer(t, store, "12345678", nil)
+	c := newCustomer(t, store, "H1234567", nil)
 	o := newOrder(t, store, c.ID)
 
 	before, _ := store.Repos().Orders.HasActive(ctx, c.ID)
@@ -285,7 +290,7 @@ func TestOrders_HasActiveIgnoresDeletedOrders(t *testing.T) {
 func TestOrders_SearchFiltersSortsAndPages(t *testing.T) {
 	store := newStore(t)
 	ctx := context.Background()
-	c := newCustomer(t, store, "12345678", nil)
+	c := newCustomer(t, store, "Q1234567", nil)
 	first := newOrder(t, store, c.ID)
 	second := newOrder(t, store, c.ID)
 	loaded, _ := store.Repos().Orders.Get(ctx, second.ID)
@@ -308,7 +313,7 @@ func TestOrders_SearchFiltersSortsAndPages(t *testing.T) {
 func TestCustomers_SearchLikeIsAContainsMatchAndEscapesWildcards(t *testing.T) {
 	store := newStore(t)
 	ctx := context.Background()
-	newCustomer(t, store, "12345678", nil)
+	newCustomer(t, store, "L1234567", nil)
 
 	hit, err := store.Repos().Customers.Search(ctx, app.SearchRequest{Size: 10, Filters: map[string][]app.Condition{"name": {{Op: "lk", Value: "n"}}}})
 	miss, _ := store.Repos().Customers.Search(ctx, app.SearchRequest{Size: 10, Filters: map[string][]app.Condition{"name": {{Op: "lk", Value: "%"}}}})
@@ -321,7 +326,7 @@ func TestCustomers_SearchLikeIsAContainsMatchAndEscapesWildcards(t *testing.T) {
 func TestInTx_RollsBackOnError(t *testing.T) {
 	store := newStore(t)
 	ctx := context.Background()
-	c := newCustomer(t, store, "12345678", nil)
+	c := newCustomer(t, store, "I1234567", nil)
 
 	err := store.InTx(ctx, func(ctx context.Context, r app.Repositories) error {
 		if _, err := domain.NewOrder(c.ID, nil, "u", now); err != nil {
