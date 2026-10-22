@@ -12,9 +12,9 @@ test:
 test-integration:
 	TEST_DATABASE_URL=postgres://orders:orders@127.0.0.1:5432/orders?sslmode=disable go test -p 1 -race -count=1 ./internal/postgres/... ./internal/httpapi/...
 
+# golangci-lint já roda gofmt e govet, então não há `go vet` separado.
 lint:
 	gofmt -l . | (! grep .)
-	go vet ./...
 	golangci-lint run
 
 vuln:

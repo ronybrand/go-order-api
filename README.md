@@ -106,7 +106,7 @@ A API e o worker são dois processos independentes, ligados só pela fila. Se o 
 ## Desenvolvimento
 
 ```sh
-make verify              # gofmt, vet, golangci-lint, testes com -race, govulncheck
+make verify              # gofmt, golangci-lint (inclui govet), testes com -race, govulncheck
 make test-integration    # precisa de PostgreSQL (docker compose up -d postgres)
 ```
 

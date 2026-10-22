@@ -13,7 +13,38 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  verify:
+  # The checks that need no infrastructure are their own jobs: they start immediately instead of
+  # waiting for the Postgres/RabbitMQ containers to become healthy, and they run in parallel with
+  # the test suite.
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with: { go-version-file: go.mod }
+      - run: gofmt -l . | (! grep .)
+      # golangci-lint already runs gofmt and govet (.golangci.yml), so a separate `go vet ./...`
+      # only duplicated work.
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with: { version: latest }
+
+  vuln:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with: { go-version-file: go.mod }
+      # setup-go caches GOMODCACHE/GOCACHE, so the compilation of govulncheck is reused between
+      # runs. The version stays pinned instead of pulling whatever @latest resolves to.
+      - run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0 && govulncheck ./...
+
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -37,15 +68,10 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with: { go-version-file: go.mod }
-      - run: gofmt -l . | (! grep .)
-      - run: go vet ./...
-      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with: { version: latest }
       # -p 1: internal/postgres and internal/httpapi are integration suites that share the same
       # database and TRUNCATE it in their setup, so their test binaries must not run in parallel.
       - run: go test -p 1 -race -count=1 -coverprofile=coverage.out ./internal/...
       - run: sh scripts/check-coverage.sh coverage.out 80
-      - run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0 && govulncheck ./...
 
   # The Dockerfile is what ships, and nothing else built it: a break (a base image tag, the Go
   # version, a moved cmd/ directory) would only show up when someone deployed. Builds both
@@ -80,3 +106,14 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
+
+  # Branch protection requires a check named "verify"; now that the work is split across jobs,
+  # this is the single gate that goes red when any of them does.
+  verify:
+    if: always()
+    needs: [lint, vuln, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
