@@ -12,15 +12,18 @@ test:
 test-integration:
 	TEST_DATABASE_URL=postgres://orders:orders@127.0.0.1:5432/orders?sslmode=disable go test -p 1 -race -count=1 ./internal/postgres/... ./internal/httpapi/...
 
+# golangci-lint já roda govet, então não há `go vet` separado. O gofmt fica porque é barato e
+# também pega .go fora de qualquer pacote compilável.
 lint:
 	gofmt -l . | (! grep .)
-	go vet ./...
 	golangci-lint run
 
+# Versão fixada igual à do CI: um govulncheck antigo no PATH não pode fazer o gate local passar.
 vuln:
-	govulncheck ./...
+	go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
-# The single local gate, same as CI.
+# Gate local: os mesmos jobs lint, test e vuln do CI. O CI ainda builda e escaneia as imagens
+# Docker (job image), que não fazem sentido no fluxo local.
 verify: lint test vuln
 
 run-api:
