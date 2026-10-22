@@ -29,9 +29,10 @@ jobs:
       # sub-second check and it also catches .go files that no package build pulls in.
       - run: gofmt -l . | (! grep .)
       # golangci-lint already runs govet (.golangci.yml), so a separate `go vet ./...` only
-      # duplicated work.
+      # duplicated work. The tool version is pinned for the same reason as govulncheck below:
+      # `latest` would run whatever upstream published, unreproducible and unpinnable by Dependabot.
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with: { version: latest }
+        with: { version: v2.12.2 }
 
   vuln:
     runs-on: ubuntu-latest
@@ -51,13 +52,17 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:16-alpine
+        # Digests mirror docker-compose.yml: the same image runs locally and here, and a retagged
+        # upstream tag cannot change what the suite runs against.
+        image: postgres:16-alpine@sha256:deb28ee471183cb0c303113dac9b2433c51eeeeb678def7af9a9ec5820367815
         env: { POSTGRES_USER: orders, POSTGRES_PASSWORD: orders, POSTGRES_DB: orders }
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U orders" --health-interval 5s --health-retries 10
       rabbitmq:
-        image: rabbitmq:3.13-alpine
+        # Pinned to the digest and the variant used by docker-compose.yml, so the broker exercised
+        # by the integration tests is the one developers run.
+        image: rabbitmq:3.13-management-alpine@sha256:606d8c0d6b3c18d1da9afc53bc7cdb2a8d5486df91b5a9830e9e07626c9ae281
         ports: ["5672:5672"]
         options: >-
           --health-cmd "rabbitmq-diagnostics -q ping" --health-interval 10s --health-retries 10
@@ -111,12 +116,15 @@ jobs:
 
   # Branch protection requires a check named "verify"; now that the work is split across jobs,
   # this is the single gate that goes red when any of them does -- including the image build and
-  # its Trivy scan, which are part of what ships.
+  # its Trivy scan, which are part of what ships. Every job of this workflow must be listed in
+  # `needs`, or its failure would not block anything. A skipped job counts as a failure on
+  # purpose: a job that never ran did not pass, so a future `if:`/path filter cannot turn this
+  # gate green by silently skipping the work.
   verify:
     if: always()
     needs: [lint, vuln, test, image]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
         run: exit 1

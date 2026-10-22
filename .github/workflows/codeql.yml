@@ -14,7 +14,9 @@ jobs:
   analyze:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: github.actor != 'dependabot[bot]'
+    # Runs for Dependabot too: skipping it let dependency bumps be auto-merged with no static
+    # analysis at all. A Dependabot-triggered run gets a read-only GITHUB_TOKEN, but the
+    # `permissions` block below escalates that scope, which is what the SARIF upload needs.
     permissions:
       contents: read
       security-events: write

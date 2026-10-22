@@ -18,10 +18,12 @@ lint:
 	gofmt -l . | (! grep .)
 	golangci-lint run
 
+# Versão fixada igual à do CI: um govulncheck antigo no PATH não pode fazer o gate local passar.
 vuln:
-	govulncheck ./...
+	go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
-# The single local gate, same as CI.
+# Gate local: os mesmos jobs lint, test e vuln do CI. O CI ainda builda e escaneia as imagens
+# Docker (job image), que não fazem sentido no fluxo local.
 verify: lint test vuln
 
 run-api:

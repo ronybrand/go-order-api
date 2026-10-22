@@ -28,8 +28,10 @@ instead of manual reports.
 
 ## What the project already does
 
-- Weekly Dependabot updates, auto-merged (patch and minor only) after CI passes; actions pinned by SHA.
-- `govulncheck` and `golangci-lint` (with `gosec`, `govet` and `gofmt`) enforced in CI; tests run with `-race`.
+- Weekly Dependabot updates, auto-merged (patch and minor only) after CI passes; actions pinned by SHA
+  and CodeQL analyzing the bump pull requests too.
+- `govulncheck` and `golangci-lint` (with `gosec`, `govet` and `gofmt`) enforced in CI with pinned tool
+  versions, and CI service images pinned by digest; tests run with `-race`.
 - RS256 JWT verification only (no signing key in the service), with required `exp`, `aud` and `iss`
   (see [ADR 0003](docs/adr/0003-jwt-rs256-somente-verificacao.md)).
 - Security headers, a request body limit that also counts chunked uploads, per-user, write and per-IP rate limits.
