@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with: { go-version-file: go.mod }
       # Kept next to golangci-lint even though its gofmt formatter covers the same tree: this is a
       # sub-second check and it also catches .go files that no package build pulls in.
@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with: { go-version-file: go.mod }
       # setup-go caches GOMODCACHE/GOCACHE, so building govulncheck reuses the cache between runs.
       # The version stays pinned instead of pulling whatever @latest resolves to.
@@ -75,7 +75,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with: { go-version-file: go.mod }
       # -p 1: internal/postgres and internal/httpapi are integration suites that share the same
       # database and TRUNCATE it in their setup, so their test binaries must not run in parallel.
